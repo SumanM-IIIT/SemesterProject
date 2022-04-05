@@ -89,12 +89,12 @@ def main():
                 time.sleep(randint(1, 5))
                 for i in range(len(p2p.peers)):
                     try:
-                        ip_port = p2p.peers.split(":")
+                        ip_port = p2p.peers[i].split(":")
                         client = Client(ip_port[0], int(ip_port[1]))
-                    except KeyboardInterrupt:
-                        sys.exit(0)
+                    #except KeyboardInterrupt:
+                    #    sys.exit(0)
                     except:
-                        pass
+                        print("CONNECTION REFUSED")
                     try:
                         ip_port = p2p.peers[i].split(":")
                         server = Server(ip_port[0], int(ip_port[1]))
