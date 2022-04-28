@@ -1,115 +1,189 @@
-import time
-from random import randint
-import sys
+from tkinter import *
+#from ttk import *
+#from tkinter import ttk
 import socket
 import threading
 
-class Server:
-    connections = []
-    peers = []
+class ChatClient(Frame):
+  
+  def __init__(self, root):
+    Frame.__init__(self, root)
+    self.root = root
+    self.initUI()
+    self.serverSoc = None
+    self.serverStatus = 0
+    self.buffsize = 1024
+    self.allClients = {}
+    self.counter = 0
+  
+  def initUI(self):
+    self.root.title("Simple P2P Chat Client")
+    ScreenSizeX = self.root.winfo_screenwidth()
+    ScreenSizeY = self.root.winfo_screenheight()
+    self.FrameSizeX  = 800
+    self.FrameSizeY  = 600
+    FramePosX   = (ScreenSizeX - self.FrameSizeX)/2
+    FramePosY   = (ScreenSizeY - self.FrameSizeY)/2
+    self.root.geometry("%sx%s+%s+%s" % (self.FrameSizeX,self.FrameSizeY,int(FramePosX),int(FramePosY)))
+    self.root.resizable(width=False, height=False)
+    
+    padX = 10
+    padY = 10
+    parentFrame = Frame(self.root)
+    parentFrame.grid(padx=padX, pady=padY, stick=E+W+N+S)
+    
+    ipGroup = Frame(parentFrame)
+    serverLabel = Label(ipGroup, text="Set: ")
+    self.nameVar = StringVar()
+    self.nameVar.set("SDH")
+    nameField = Entry(ipGroup, width=10, textvariable=self.nameVar)
+    self.serverIPVar = StringVar()
+    self.serverIPVar.set("127.0.0.1")
+    serverIPField = Entry(ipGroup, width=15, textvariable=self.serverIPVar)
+    self.serverPortVar = StringVar()
+    self.serverPortVar.set("8090")
+    serverPortField = Entry(ipGroup, width=5, textvariable=self.serverPortVar)
+    serverSetButton = Button(ipGroup, text="Set", width=10, command=self.handleSetServer)
+    addClientLabel = Label(ipGroup, text="Add friend: ")
+    self.clientIPVar = StringVar()
+    self.clientIPVar.set("127.0.0.1")
+    clientIPField = Entry(ipGroup, width=15, textvariable=self.clientIPVar)
+    self.clientPortVar = StringVar()
+    self.clientPortVar.set("8091")
+    clientPortField = Entry(ipGroup, width=5, textvariable=self.clientPortVar)
+    clientSetButton = Button(ipGroup, text="Add", width=10, command=self.handleAddClient)
+    serverLabel.grid(row=0, column=0)
+    nameField.grid(row=0, column=1)
+    serverIPField.grid(row=0, column=2)
+    serverPortField.grid(row=0, column=3)
+    serverSetButton.grid(row=0, column=4, padx=5)
+    addClientLabel.grid(row=0, column=5)
+    clientIPField.grid(row=0, column=6)
+    clientPortField.grid(row=0, column=7)
+    clientSetButton.grid(row=0, column=8, padx=5)
+    
+    readChatGroup = Frame(parentFrame)
+    self.receivedChats = Text(readChatGroup, bg="white", width=60, height=30, state=DISABLED)
+    self.friends = Listbox(readChatGroup, bg="white", width=30, height=30)
+    self.receivedChats.grid(row=0, column=0, sticky=W+N+S, padx = (0,10))
+    self.friends.grid(row=0, column=1, sticky=E+N+S)
 
-    def __init__(self, ip, port):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((ip, port))
-        sock.listen(2)
+    writeChatGroup = Frame(parentFrame)
+    self.chatVar = StringVar()
+    self.chatField = Entry(writeChatGroup, width=80, textvariable=self.chatVar)
+    sendChatButton = Button(writeChatGroup, text="Send", width=10, command=self.handleSendChat)
+    self.chatField.grid(row=0, column=0, sticky=W)
+    sendChatButton.grid(row=0, column=1, padx=5)
 
-        print("Server <" + ip + ":" + str(port) + "> Running...")
-        while True:
-            conn, addr = sock.accept()
-            connThread = threading.Thread(target = self.handler, args = (conn, addr))
-            connThread.daemon = True
-            connThread.start()
-            print("Faltu")
-            self.connections.append(conn)
-            self.peers.append(addr[0])
-            print(str(addr[0]) + ":" + str(addr[1]), "Connected !!")
-            self.sendPeersInfo()
+    self.statusLabel = Label(parentFrame)
 
-    def handler(self, conn, addr):
-        while True:
-            data = conn.recv(1024)
-            for connections in self.connections:
-                connections.send(data)
-            if not data:
-                print(str(addr[0]) + ":" + str(addr[1]), "Disonnected :(")
-                self.connections.remove(conn)
-                self.peers.remove(addr[0])
-                conn.close()
-                self.sendPeersInfo()
-                break
+    bottomLabel = Label(parentFrame, text="Created by Siddhartha under Prof. A. Prakash [Computer Networks, Dept. of CSE, BIT Mesra]")
+    
+    ipGroup.grid(row=0, column=0)
+    readChatGroup.grid(row=1, column=0)
+    writeChatGroup.grid(row=2, column=0, pady=10)
+    self.statusLabel.grid(row=3, column=0)
+    bottomLabel.grid(row=4, column=0, pady=10)
+    
+  def handleSetServer(self):
+    if self.serverSoc != None:
+        self.serverSoc.close()
+        self.serverSoc = None
+        self.serverStatus = 0
+    serveraddr = (self.serverIPVar.get().replace(' ',''), int(self.serverPortVar.get().replace(' ','')))
+    try:
+        self.serverSoc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print(1)
+        self.serverSoc.bind(serveraddr)
+        print(2)
+        self.serverSoc.listen(5)
+        print(3)
+        self.setStatus("Server listening on %s:%s" % serveraddr)
+        print(4)
+        #thread.start_new_thread(self.listenClients,())
+        threading.Thread(target=self.listenClients).start()
+        print(5)
+        self.serverStatus = 1
+        print(6)
+        self.name = self.nameVar.get().replace(' ','')
+        print(7)
+        if self.name == '':
+            self.name = "%s:%s" % serveraddr
+    except:
+        self.setStatus("Error setting up server")
+    
+  def listenClients(self):
+    while 1:
+      clientsoc, clientaddr = self.serverSoc.accept()
+      self.setStatus("Client connected from %s:%s" % clientaddr)
+      self.addClient(clientsoc, clientaddr)
+      #thread.start_new_thread(self.handleClientMessages, (clientsoc, clientaddr))
+      threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr)).start()
+    self.serverSoc.close()
+  
+  def handleAddClient(self):
+    if self.serverStatus == 0:
+      self.setStatus("Set server address first")
+      return
+    clientaddr = (self.clientIPVar.get().replace(' ',''), int(self.clientPortVar.get().replace(' ','')))
+    try:
+        clientsoc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        clientsoc.connect(clientaddr)
+        self.setStatus("Connected to client on %s:%s" % clientaddr)
+        self.addClient(clientsoc, clientaddr)
+        #thread.start_new_thread(self.handleClientMessages, (clientsoc, clientaddr))
+        threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr)).start()
+    except:
+        self.setStatus("Error connecting to client")
 
-    def sendPeersInfo(self):
-        pStr = ""
-        for peer in self.peers:
-            pStr += peer + ","
+  def handleClientMessages(self, clientsoc, clientaddr):
+    while 1:
+      try:
+        data = clientsoc.recv(self.buffsize).decode()
+        if not data:
+            break
+        self.addChat("%s:%s" % clientaddr, data)
+      except:
+          break
+    self.removeClient(clientsoc, clientaddr)
+    clientsoc.close()
+    self.setStatus("Client disconnected from %s:%s" % clientaddr)
+  
+  def handleSendChat(self):
+    if self.serverStatus == 0:
+      self.setStatus("Set server address first")
+      return
+    msg = self.chatVar.get().replace(' ','')
+    if msg == '':
+        return
+    self.addChat("me", msg)
+    for client in self.allClients.keys():
+      client.send(msg.encode())
+  
+  def addChat(self, client, msg):
+    self.receivedChats.config(state=NORMAL)
+    self.receivedChats.insert("end",client+": "+msg+"\n")
+    self.receivedChats.config(state=DISABLED)
+  
+  def addClient(self, clientsoc, clientaddr):
+    self.allClients[clientsoc]=self.counter
+    self.counter += 1
+    self.friends.insert(self.counter,"%s:%s" % clientaddr)
+  
+  def removeClient(self, clientsoc, clientaddr):
+      print(self.allClients)
+      self.friends.delete(self.allClients[clientsoc])
+      del self.allClients[clientsoc]
+      print(self.allClients)
+  
+  def setStatus(self, msg):
+    self.statusLabel.config(text=msg)
+    print(msg)
+      
+def main():  
+  root = Tk()
+  app = ChatClient(root)
+  root.mainloop()  
 
-        for c in self.connections:
-            c.send(b'\x11' + bytes(p, "utf-8"))
-
-class Client:
-    def __init__(self, ip, port):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.connect((ip, port))
-
-        c2Thread = threading.Thread(target = self.sendMsg, args = (sock,))
-        c2Thread.daemon = True
-        c2Thread.start()
-
-        print("Client <" + ip + ":" + str(port) + "> Running...")
-        while True:
-            data = sock.recv(1024)
-            if not data:
-                break
-            if data[0:1] == b'\x11':
-                print("Got Peers List :)")
-                self.updatePeersList(data[1:])
-            else:
-                print(str(data, "utf-8"))
-
-    def sendMsg(self, sock):
-        while True:
-            sock.send(bytes(input("->"), "utf-8"))
-
-    def updatePeersList(self, peersData):
-        p2p.peers = str(peersData, "utf-8").split(",")[:-1]
-
-class p2p:
-    peers = []
-
-def main():
-    if (len(sys.argv) > 1):
-        #client = Client(sys.argv[2], sys.argv[3])
-        peer_full = sys.argv[1] + ":" + sys.argv[2]
-        p2p.peers.append(peer_full)
-        while True:
-            try:
-                print("Connecting...")
-                time.sleep(randint(1, 5))
-                for i in range(len(p2p.peers)):
-                    try:
-                        ip_port = p2p.peers[i].split(":")
-                        client = Client(ip_port[0], int(ip_port[1]))
-                    #except KeyboardInterrupt:
-                    #    sys.exit(0)
-                    except:
-                        print("CONNECTION REFUSED")
-                    try:
-                        ip_port = p2p.peers[i].split(":")
-                        server = Server(ip_port[0], int(ip_port[1]))
-                    except KeyboardInterrupt:
-                        sys.exit(0)
-                    except:
-                        print("Couldn't start the server !!")
-
-            except KeyboardInterrupt:
-                sys.exit(0)
-    else:
-        print("Too Few Arguments !!")
-
-if __name__=="__main__":
-    main()
-
-### REFERENCES:
-# 1. https://www.youtube.com/watch?v=Rvfs6Xx3Kww - "P2P Chat App in Python" by "howCode" - Jun 24, 2017
+if __name__ == '__main__':
+  main()  
