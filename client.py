@@ -15,6 +15,7 @@ class ChatClient(Frame):
     self.buffsize = 1024
     self.allClients = {}
     self.counter = 0
+    self.separator = '<SEP>'
   
   def initUI(self):
     self.root.title("Simple P2P Chat Client")
@@ -33,23 +34,26 @@ class ChatClient(Frame):
     parentFrame.grid(padx=padX, pady=padY, stick=E+W+N+S)
     
     ipGroup = Frame(parentFrame)
-    serverLabel = Label(ipGroup, text="Set: ")
+    serverLabel = Label(ipGroup, text="Your Details: ")
     self.nameVar = StringVar()
-    self.nameVar.set("SDH")
+    self.nameVar.set("Suman")
     nameField = Entry(ipGroup, width=10, textvariable=self.nameVar)
+    #serverIPLabel = Label(ipGroup, text="IP: ")
     self.serverIPVar = StringVar()
     self.serverIPVar.set("127.0.0.1")
     serverIPField = Entry(ipGroup, width=15, textvariable=self.serverIPVar)
+    #serverPortLabel = Label(ipGroup, text="Port: ")
     self.serverPortVar = StringVar()
-    self.serverPortVar.set("8090")
+    self.serverPortVar.set("8000")
     serverPortField = Entry(ipGroup, width=5, textvariable=self.serverPortVar)
     serverSetButton = Button(ipGroup, text="Set", width=10, command=self.handleSetServer)
-    addClientLabel = Label(ipGroup, text="Add friend: ")
+    addClientLabel = Label(ipGroup, text="Friend's Address: ")
     self.clientIPVar = StringVar()
     self.clientIPVar.set("127.0.0.1")
     clientIPField = Entry(ipGroup, width=15, textvariable=self.clientIPVar)
+    #friendPortLabel = Label(ipGroup, text="Port: ")
     self.clientPortVar = StringVar()
-    self.clientPortVar.set("8091")
+    self.clientPortVar.set("8002")
     clientPortField = Entry(ipGroup, width=5, textvariable=self.clientPortVar)
     clientSetButton = Button(ipGroup, text="Add", width=10, command=self.handleAddClient)
     serverLabel.grid(row=0, column=0)
@@ -93,20 +97,20 @@ class ChatClient(Frame):
     serveraddr = (self.serverIPVar.get().replace(' ',''), int(self.serverPortVar.get().replace(' ','')))
     try:
         self.serverSoc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print(1)
+        #print(1)
         self.serverSoc.bind(serveraddr)
-        print(2)
+        #print(2)
         self.serverSoc.listen(5)
-        print(3)
+        #print(3)
         self.setStatus("Server listening on %s:%s" % serveraddr)
-        print(4)
+        #print(4)
         #thread.start_new_thread(self.listenClients,())
         threading.Thread(target=self.listenClients).start()
-        print(5)
+        #print(5)
         self.serverStatus = 1
-        print(6)
+        #print(6)
         self.name = self.nameVar.get().replace(' ','')
-        print(7)
+        #print(7)
         if self.name == '':
             self.name = "%s:%s" % serveraddr
     except:
@@ -142,7 +146,9 @@ class ChatClient(Frame):
         data = clientsoc.recv(self.buffsize).decode()
         if not data:
             break
-        self.addChat("%s:%s" % clientaddr, data)
+        actualData = data.split(self.separator)
+        #self.addChat("%s:%s" % clientaddr, actualData[0])
+        self.addChat(actualData[1], actualData[0])
       except:
           break
     self.removeClient(clientsoc, clientaddr)
@@ -156,7 +162,8 @@ class ChatClient(Frame):
     msg = self.chatVar.get().replace(' ','')
     if msg == '':
         return
-    self.addChat("me", msg)
+    self.addChat("me (" + self.nameVar.get() + ")", msg)
+    msg += self.separator + self.nameVar.get()
     for client in self.allClients.keys():
       client.send(msg.encode())
   
