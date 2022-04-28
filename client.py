@@ -3,6 +3,7 @@ from tkinter import *
 #from tkinter import ttk
 import socket
 import threading
+import emoji
 
 class ChatClient(Frame):
   
@@ -76,12 +77,13 @@ class ChatClient(Frame):
     self.chatVar = StringVar()
     self.chatField = Entry(writeChatGroup, width=80, textvariable=self.chatVar)
     sendChatButton = Button(writeChatGroup, text="Send", width=10, command=self.handleSendChat)
+    #sendEmojiButton = Button(writeChatGroup, text="Send Emoji", width=10, command=self.handleSendChat)
     self.chatField.grid(row=0, column=0, sticky=W)
     sendChatButton.grid(row=0, column=1, padx=5)
 
     self.statusLabel = Label(parentFrame)
 
-    bottomLabel = Label(parentFrame, text="Created by Siddhartha under Prof. A. Prakash [Computer Networks, Dept. of CSE, BIT Mesra]")
+    bottomLabel = Label(parentFrame, text="Made by Aditya Mahajan, Suman Mitra & Akshay Chaudhary under Prof. K. Srinathan, IIIT Hyd")
     
     ipGroup.grid(row=0, column=0)
     readChatGroup.grid(row=1, column=0)
@@ -139,7 +141,7 @@ class ChatClient(Frame):
         threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr)).start()
     except:
         self.setStatus("Error connecting to client")
-
+  
   def handleClientMessages(self, clientsoc, clientaddr):
     while 1:
       try:
@@ -147,8 +149,11 @@ class ChatClient(Frame):
         if not data:
             break
         actualData = data.split(self.separator)
+        msgCon = ''
+        for i in range(len(actualData) - 1):
+            msgCon += actualData[i] + ' '
         #self.addChat("%s:%s" % clientaddr, actualData[0])
-        self.addChat(actualData[1], actualData[0])
+        self.addChat(actualData[-1], msgCon)
       except:
           break
     self.removeClient(clientsoc, clientaddr)
@@ -159,17 +164,20 @@ class ChatClient(Frame):
     if self.serverStatus == 0:
       self.setStatus("Set server address first")
       return
-    msg = self.chatVar.get().replace(' ','')
+    msg = self.chatVar.get()
     if msg == '':
         return
+            
     self.addChat("me (" + self.nameVar.get() + ")", msg)
+    msg = msg.replace(' ',self.separator)
     msg += self.separator + self.nameVar.get()
     for client in self.allClients.keys():
       client.send(msg.encode())
   
   def addChat(self, client, msg):
+    msgPrint = emoji.emojize(msg)
     self.receivedChats.config(state=NORMAL)
-    self.receivedChats.insert("end",client+": "+msg+"\n")
+    self.receivedChats.insert("end",client+": "+msgPrint+"\n")
     self.receivedChats.config(state=DISABLED)
   
   def addClient(self, clientsoc, clientaddr):
