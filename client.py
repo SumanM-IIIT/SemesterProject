@@ -1,9 +1,13 @@
 from tkinter import *
 #from ttk import *
 #from tkinter import ttk
+from tkinter.ttk import *
+from tkinter.filedialog import askopenfile
 import socket
 import threading
 import emoji
+import time
+
 
 class ChatClient(Frame):
   
@@ -77,9 +81,11 @@ class ChatClient(Frame):
     self.chatVar = StringVar()
     self.chatField = Entry(writeChatGroup, width=80, textvariable=self.chatVar)
     sendChatButton = Button(writeChatGroup, text="Send", width=10, command=self.handleSendChat)
+    sendFileButton = Button(writeChatGroup, text="Attach", width=10, command=self.handleAttachChat)
     #sendEmojiButton = Button(writeChatGroup, text="Send Emoji", width=10, command=self.handleSendChat)
     self.chatField.grid(row=0, column=0, sticky=W)
     sendChatButton.grid(row=0, column=1, padx=5)
+    sendFileButton.grid(row=0, column=2, padx=5)
 
     self.statusLabel = Label(parentFrame)
 
@@ -119,7 +125,7 @@ class ChatClient(Frame):
         self.setStatus("Error setting up server")
     
   def listenClients(self):
-    while 1:
+    while True:
       clientsoc, clientaddr = self.serverSoc.accept()
       self.setStatus("Client connected from %s:%s" % clientaddr)
       self.addClient(clientsoc, clientaddr)
@@ -168,11 +174,55 @@ class ChatClient(Frame):
     if msg == '':
         return
             
-    self.addChat("me (" + self.nameVar.get() + ")", msg)
+    self.addChat("Me (" + self.nameVar.get() + ")", msg)
     msg = msg.replace(' ',self.separator)
     msg += self.separator + self.nameVar.get()
     for client in self.allClients.keys():
       client.send(msg.encode())
+
+
+  def handleAttachChat(self):
+    ws = Tk()
+    ws.title('Attach File')
+    ws.geometry('400x200') 
+
+    def open_file():
+      file_path = askopenfile(mode='r', filetypes=[('Files', '*')])
+      if file_path is not None:
+          pass
+
+    def uploadFiles():
+      file = Label(ws, text='Attach File')
+      file.grid(row=0, column=0, padx=10) 
+
+      filebtn = Button(
+          ws, 
+          text ='Choose File', 
+          command = lambda:open_file()
+          ) 
+      filebtn.grid(row=0, column=1)
+
+      pb1 = Progressbar(
+          ws, 
+          orient=HORIZONTAL, 
+          length=300, 
+          mode='determinate'
+          )
+      pb1.grid(row=4, columnspan=3, pady=20)
+      for i in range(5):
+          ws.update_idletasks()
+          pb1['value'] += 20
+          time.sleep(1)
+      pb1.destroy()
+      Label(ws, text='File Uploaded Successfully!', foreground='green').grid(row=4, columnspan=3, pady=10)
+
+    upld = Button(
+    ws, 
+    text='Upload Files', 
+    command=uploadFiles
+    )
+    upld.grid(row=3, columnspan=3, pady=10)
+  
   
   def addChat(self, client, msg):
     msgPrint = emoji.emojize(msg)
