@@ -124,7 +124,7 @@ class ChatClient(Frame):
         #emojiButtons[i].pack()
   
   def handleEmojiPress(self, emojiNum):
-    pass
+    print(emojiNum)
  
   
   def handleSetServer(self):
