@@ -21,9 +21,11 @@ class ChatClient(Frame):
     self.allClients = {}
     self.counter = 0
     self.separator = '<SEP>'
+    self.emojiCodes = [':']
+ 
   
   def initUI(self):
-    self.root.title("Simple P2P Chat Client")
+    self.root.title("SecureChat_P2P")
     ScreenSizeX = self.root.winfo_screenwidth()
     ScreenSizeY = self.root.winfo_screenheight()
     self.FrameSizeX  = 800
@@ -82,10 +84,11 @@ class ChatClient(Frame):
     self.chatField = Entry(writeChatGroup, width=80, textvariable=self.chatVar)
     sendChatButton = Button(writeChatGroup, text="Send", width=10, command=self.handleSendChat)
     sendFileButton = Button(writeChatGroup, text="Attach", width=10, command=self.handleAttachChat)
-    #sendEmojiButton = Button(writeChatGroup, text="Send Emoji", width=10, command=self.handleSendChat)
+    sendEmojiButton = Button(writeChatGroup, text="Emoji", width=10, command=self.handleEmoji)
     self.chatField.grid(row=0, column=0, sticky=W)
-    sendChatButton.grid(row=0, column=1, padx=5)
-    sendFileButton.grid(row=0, column=2, padx=5)
+    sendChatButton.grid(row=0, column=1, padx=2)
+    sendFileButton.grid(row=0, column=3, padx=2)
+    sendEmojiButton.grid(row=0, column=2, padx=2)
 
     self.statusLabel = Label(parentFrame)
 
@@ -96,7 +99,34 @@ class ChatClient(Frame):
     writeChatGroup.grid(row=2, column=0, pady=10)
     self.statusLabel.grid(row=3, column=0)
     bottomLabel.grid(row=4, column=0, pady=10)
+  
+  def handleEmoji(self):
+    emojiWindow = Toplevel()
+    emojiWindow.title("Emoji Window")
+    emojiWindow.geometry("")
     
+    
+    emojiCount = 24
+    emojiButtons = []
+    k = 0
+    rowCount = 0
+    global clickEmojiBtn 
+    clickEmojiBtn = []
+    
+    for i in range(emojiCount):
+        clickEmojiBtn.append(PhotoImage(file='emojis/' + str(i + 1) + '.png'))
+        emojiButtons.append(Button(emojiWindow, width=5, image = clickEmojiBtn[i], command=lambda:self.handleEmojiPress(i + 1)))
+        emojiButtons[i].grid(row=rowCount, column=k+1, padx=2)
+        k += 1
+        if k >= 8:
+            rowCount += 1
+            k = 0
+        #emojiButtons[i].pack()
+  
+  def handleEmojiPress(self, emojiNum):
+    pass
+ 
+  
   def handleSetServer(self):
     if self.serverSoc != None:
         self.serverSoc.close()
