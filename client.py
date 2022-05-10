@@ -7,6 +7,7 @@ import socket
 import threading
 import emoji
 import time
+import PySimpleGUI as sg
 
 
 class ChatClient(Frame):
@@ -21,7 +22,7 @@ class ChatClient(Frame):
     self.allClients = {}
     self.counter = 0
     self.separator = '<SEP>'
-    self.emojiCodes = [':']
+    self.emojiCodes = [':grinning_face:', ':grinning_face_with_big_eyes:', ':grinning_face_with_smiling_eyes:', ':beaming_face_with_smiling_eyes:', ':grinning_squinting_face:', ':grinning_face_with_sweat:', ':rolling_on_the_floor_laughing:', ':slightly_smiling_face:', ':upside-down_face:', ':winking_face:', ':smiling_face_with_smiling_eyes:', ':smiling_face_with_halo:', ':smiling_face_with_heart-eyes:', ':star-struck:', ':face_blowing_a_kiss:', ':expressionless_face:', ':smiling_face_with_tear:', ':face_savoring_food:', ':winking_face_with_tongue:', ':squinting_face_with_tongue:', ':money-mouth_face:', ':smiling_face_with_open_hands:', ':face_with_hand_over_mouth:', ':thinking_face:']
  
   
   def initUI(self):
@@ -75,6 +76,7 @@ class ChatClient(Frame):
     
     readChatGroup = Frame(parentFrame)
     self.receivedChats = Text(readChatGroup, bg="white", width=60, height=30, state=DISABLED)
+    
     self.friends = Listbox(readChatGroup, bg="white", width=30, height=30)
     self.receivedChats.grid(row=0, column=0, sticky=W+N+S, padx = (0,10))
     self.friends.grid(row=0, column=1, sticky=E+N+S)
@@ -115,7 +117,7 @@ class ChatClient(Frame):
     
     for i in range(emojiCount):
         clickEmojiBtn.append(PhotoImage(file='emojis/' + str(i + 1) + '.png'))
-        emojiButtons.append(Button(emojiWindow, width=5, image = clickEmojiBtn[i], command=lambda:self.handleEmojiPress(i + 1)))
+        emojiButtons.append(Button(emojiWindow, width=5, image = clickEmojiBtn[i], command=lambda k=i:self.handleEmojiPress(k)))
         emojiButtons[i].grid(row=rowCount, column=k+1, padx=2)
         k += 1
         if k >= 8:
@@ -124,7 +126,8 @@ class ChatClient(Frame):
         #emojiButtons[i].pack()
   
   def handleEmojiPress(self, emojiNum):
-    print(emojiNum)
+    msg = self.chatVar.get()
+    self.chatVar.set(emoji.emojize(msg + str(self.emojiCodes[emojiNum])))
  
   
   def handleSetServer(self):
