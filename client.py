@@ -22,7 +22,7 @@ class ChatClient(Frame):
     self.allClients = {}
     self.counter = 0
     self.separator = '<SEP>'
-    self.emojiCodes = [':grinning_face:', ':grinning_face_with_big_eyes:', ':grinning_face_with_smiling_eyes:', ':beaming_face_with_smiling_eyes:', ':grinning_squinting_face:', ':grinning_face_with_sweat:', ':rolling_on_the_floor_laughing:', ':slightly_smiling_face:', ':upside-down_face:', ':winking_face:', ':smiling_face_with_smiling_eyes:', ':smiling_face_with_halo:', ':smiling_face_with_heart-eyes:', ':star-struck:', ':face_blowing_a_kiss:', ':expressionless_face:', ':smiling_face_with_tear:', ':face_savoring_food:', ':winking_face_with_tongue:', ':squinting_face_with_tongue:', ':money-mouth_face:', ':smiling_face_with_open_hands:', ':face_with_hand_over_mouth:', ':thinking_face:']
+    self.emojiCodes = [':grinning_face:', ':grinning_face_with_big_eyes:', ':grinning_face_with_smiling_eyes:', ':beaming_face_with_smiling_eyes:', ':grinning_squinting_face:', ':grinning_face_with_sweat:', ':rolling_on_the_floor_laughing:', ':slightly_smiling_face:', ':upside-down_face:', ':winking_face:', ':smiling_face_with_smiling_eyes:', ':smiling_face_with_halo:', ':smiling_face_with_heart-eyes:', ':star-struck:', ':face_blowing_a_kiss:', ':expressionless_face:', ':smiling_face_with_tear:', ':face_savoring_food:', ':winking_face_with_tongue:', ':squinting_face_with_tongue:', ':money-mouth_face:', ':smiling_face_with_open_hands:', ':face_with_hand_over_mouth:', ':thinking_face:', ':zipper-mouth_face:', ':neutral_face:', ':face_without_mouth:', ':unamused_face:', ':sleepy_face:', ':drooling_face:', ':sleeping_face:', ':face_with_medical_mask:', ':face_with_thermometer:', ':nauseated_face:', ':face_vomiting:', ':face_with_head-bandage:', ':sneezing_face:', ':hot_face:', ':cold_face:', ':face_with_crossed-out_eyes:', ':partying_face:', ':smiling_face_with_sunglasses:', ':face_with_monocle:', ':worried_face:', ':face_with_open_mouth:', ':flushed_face:', ':loudly_crying_face:', ':crying_face:', ':face_screaming_in_fear:', ':confounded_face:', ':disappointed_face:', ':downcast_face_with_sweat:', ':face_with_steam_from_nose:', ':pouting_face:', ':face_with_symbols_on_mouth:', ':smiling_face_with_horns:', ':skull:', ':pile_of_poo:', ':ogre:', ':ghost:', ':alien:', ':robot:', ':grinning_cat:', ':bomb:']
  
   
   def initUI(self):
@@ -108,7 +108,7 @@ class ChatClient(Frame):
     emojiWindow.geometry("")
     
     
-    emojiCount = 24
+    emojiCount = len(self.emojiCodes)
     emojiButtons = []
     k = 0
     rowCount = 0
@@ -212,6 +212,7 @@ class ChatClient(Frame):
     msg += self.separator + self.nameVar.get()
     for client in self.allClients.keys():
       client.send(msg.encode())
+    self.chatVar.set('')
 
 
   def handleAttachChat(self):
