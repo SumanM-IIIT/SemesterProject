@@ -232,8 +232,8 @@ class ChatClient(Frame):
         msg += self.separator + self.nameVar.get()
         
         paddedMsg = self.padding(msg) 
-        #iv = Random.new().read(AES.block_size)
-        print('sent iv:', iv)
+        iv = Random.new().read(AES.block_size)
+        #print('sent iv:', iv)
         cipher = AES.new(self.key128, AES.MODE_OFB, iv)
         #print('padded msg: ', paddedMsg)
         msgCipher = cipher.encrypt(paddedMsg.encode())
