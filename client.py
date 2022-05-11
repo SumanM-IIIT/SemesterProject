@@ -8,6 +8,7 @@ import threading
 import emoji
 import time
 import PySimpleGUI as sg
+from Crypto.Cipher import AES
 
 
 class ChatClient(Frame):
@@ -23,6 +24,7 @@ class ChatClient(Frame):
     self.counter = 0
     self.separator = '<SEP>'
     self.emojiCodes = [':grinning_face:', ':grinning_face_with_big_eyes:', ':grinning_face_with_smiling_eyes:', ':beaming_face_with_smiling_eyes:', ':grinning_squinting_face:', ':grinning_face_with_sweat:', ':rolling_on_the_floor_laughing:', ':slightly_smiling_face:', ':upside-down_face:', ':winking_face:', ':smiling_face_with_smiling_eyes:', ':smiling_face_with_halo:', ':smiling_face_with_heart-eyes:', ':star-struck:', ':face_blowing_a_kiss:', ':expressionless_face:', ':smiling_face_with_tear:', ':face_savoring_food:', ':winking_face_with_tongue:', ':squinting_face_with_tongue:', ':money-mouth_face:', ':smiling_face_with_open_hands:', ':face_with_hand_over_mouth:', ':thinking_face:', ':zipper-mouth_face:', ':neutral_face:', ':face_without_mouth:', ':unamused_face:', ':sleepy_face:', ':drooling_face:', ':sleeping_face:', ':face_with_medical_mask:', ':face_with_thermometer:', ':nauseated_face:', ':face_vomiting:', ':face_with_head-bandage:', ':sneezing_face:', ':hot_face:', ':cold_face:', ':face_with_crossed-out_eyes:', ':partying_face:', ':smiling_face_with_sunglasses:', ':face_with_monocle:', ':worried_face:', ':face_with_open_mouth:', ':flushed_face:', ':loudly_crying_face:', ':crying_face:', ':face_screaming_in_fear:', ':confounded_face:', ':disappointed_face:', ':downcast_face_with_sweat:', ':face_with_steam_from_nose:', ':pouting_face:', ':face_with_symbols_on_mouth:', ':smiling_face_with_horns:', ':skull:', ':pile_of_poo:', ':ogre:', ':ghost:', ':alien:', ':robot:', ':grinning_cat:', ':bomb:']
+    self.key128 = b'abcdefghijklmnop'
  
   
   def initUI(self):
@@ -102,6 +104,11 @@ class ChatClient(Frame):
     self.statusLabel.grid(row=3, column=0)
     bottomLabel.grid(row=4, column=0, pady=10)
   
+  def padding(self, text):
+    while len(text) % 16 != 0:
+        text += ' ' 
+    return text
+    
   def handleEmoji(self):
     emojiWindow = Toplevel()
     emojiWindow.title("Emoji Window")
@@ -184,15 +191,21 @@ class ChatClient(Frame):
   def handleClientMessages(self, clientsoc, clientaddr):
     while 1:
       try:
-        data = clientsoc.recv(self.buffsize).decode()
+        recvData = clientsoc.recv(self.buffsize)#.decode()
+        decipher = AES.new(self.key128, AES.MODE_ECB)
+        data = decipher.decrypt(recvData)
+        
         if not data:
             break
+        data = emoji.emojize(str(data)[2:-1])
+        #print('Data:', data)
         actualData = data.split(self.separator)
+        #print('Actual Data:', actualData)
         msgCon = ''
         for i in range(len(actualData) - 1):
             msgCon += actualData[i] + ' '
         #self.addChat("%s:%s" % clientaddr, actualData[0])
-        self.addChat(actualData[-1], msgCon)
+        self.addChat(actualData[-1].strip(), msgCon)
       except:
           break
     self.removeClient(clientsoc, clientaddr)
@@ -203,18 +216,35 @@ class ChatClient(Frame):
     if self.serverStatus == 0:
       self.setStatus("Set server address first")
       return
-    msg = self.chatVar.get()
+    msg = emoji.demojize(self.chatVar.get())
     if msg == '':
         return
             
     self.addChat("Me (" + self.nameVar.get() + ")", msg)
     msg = msg.replace(' ',self.separator)
     msg += self.separator + self.nameVar.get()
+    
+    paddedMsg = self.padding(msg) 
+    cipher = AES.new(self.key128, AES.MODE_ECB)
+    #print('padded msg: ', paddedMsg)
+    msgCipher = cipher.encrypt(paddedMsg.encode())
+    
+    #print(paddedMsg)
     for client in self.allClients.keys():
-      client.send(msg.encode())
+      client.send(msgCipher)
     self.chatVar.set('')
-
-
+    
+    #key = b'abcdefghijklmnop'
+    
+    #print(type(msgCipher))
+    #print(msgCipher)
+    #print(bytes(paddedMsg, 'utf-8'))
+    #print(str(msgCipher))
+    #print(msgCipher.encode('hex'))
+    #decipher = AES.new(self.key128, AES.MODE_ECB)
+    #print(decipher.decrypt(msgCipher))
+    
+  
   def handleAttachChat(self):
     ws = Tk()
     ws.title('Attach File')
@@ -259,6 +289,7 @@ class ChatClient(Frame):
   
   
   def addChat(self, client, msg):
+    msg = msg.strip()
     msgPrint = emoji.emojize(msg)
     self.receivedChats.config(state=NORMAL)
     self.receivedChats.insert("end",client+": "+msgPrint+"\n")
