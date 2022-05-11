@@ -9,6 +9,7 @@ import emoji
 import time
 import PySimpleGUI as sg
 from Crypto.Cipher import AES
+from Crypto import Random
 
 
 class ChatClient(Frame):
@@ -19,7 +20,7 @@ class ChatClient(Frame):
         self.initUI()
         self.serverSoc = None
         self.serverStatus = 0
-        self.buffsize = 1024
+        self.buffsize = 2048
         self.allClients = {}
         self.counter = 0
         self.separator = '<SEP>'
@@ -188,13 +189,17 @@ class ChatClient(Frame):
             #thread.start_new_thread(self.handleClientMessages, (clientsoc, clientaddr))
             threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr)).start()
         except:
-            self.setStatus("Error connecting to client")
+            self.setStatus("Error connecting to the client !!")
   
     def handleClientMessages(self, clientsoc, clientaddr):
         while 1:
             try:
                 recvData = clientsoc.recv(self.buffsize)#.decode()
-                decipher = AES.new(self.key128, AES.MODE_ECB)
+                iv = recvData[:AES.block_size]
+                recvData = recvData[AES.block_size:]
+                #print('received iv:', iv)
+                
+                decipher = AES.new(self.key128, AES.MODE_OFB, iv)
                 data = decipher.decrypt(recvData)
                 
                 if not data:
@@ -227,13 +232,15 @@ class ChatClient(Frame):
         msg += self.separator + self.nameVar.get()
         
         paddedMsg = self.padding(msg) 
-        cipher = AES.new(self.key128, AES.MODE_ECB)
+        #iv = Random.new().read(AES.block_size)
+        print('sent iv:', iv)
+        cipher = AES.new(self.key128, AES.MODE_OFB, iv)
         #print('padded msg: ', paddedMsg)
         msgCipher = cipher.encrypt(paddedMsg.encode())
         
         #print(paddedMsg)
         for client in self.allClients.keys():
-            client.send(msgCipher)
+            client.send(iv + msgCipher)
         self.chatVar.set('')
         
         #key = b'abcdefghijklmnop'
