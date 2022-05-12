@@ -2,7 +2,7 @@ from tkinter import *
 #from ttk import *
 #from tkinter import ttk
 from tkinter.ttk import *
-from tkinter.filedialog import askopenfile
+from tkinter.filedialog import askopenfile, askopenfilename
 import socket
 import threading
 import emoji
@@ -28,6 +28,7 @@ class ChatClient(Frame):
         self.allClients = {}
         self.counter = 0
         self.separator = '<SEP>'
+        self.byteSep = b'<SEP>'
         self.emojiCodes = [':grinning_face:', ':grinning_face_with_big_eyes:', ':grinning_face_with_smiling_eyes:', ':beaming_face_with_smiling_eyes:', ':grinning_squinting_face:', ':grinning_face_with_sweat:', ':rolling_on_the_floor_laughing:', ':slightly_smiling_face:', ':upside-down_face:', ':winking_face:', ':smiling_face_with_smiling_eyes:', ':smiling_face_with_halo:', ':smiling_face_with_heart-eyes:', ':star-struck:', ':face_blowing_a_kiss:', ':expressionless_face:', ':smiling_face_with_tear:', ':face_savoring_food:', ':winking_face_with_tongue:', ':squinting_face_with_tongue:', ':money-mouth_face:', ':smiling_face_with_open_hands:', ':face_with_hand_over_mouth:', ':thinking_face:', ':zipper-mouth_face:', ':neutral_face:', ':face_without_mouth:', ':unamused_face:', ':sleepy_face:', ':drooling_face:', ':sleeping_face:', ':face_with_medical_mask:', ':face_with_thermometer:', ':nauseated_face:', ':face_vomiting:', ':face_with_head-bandage:', ':sneezing_face:', ':hot_face:', ':cold_face:', ':face_with_crossed-out_eyes:', ':partying_face:', ':smiling_face_with_sunglasses:', ':face_with_monocle:', ':worried_face:', ':face_with_open_mouth:', ':flushed_face:', ':loudly_crying_face:', ':crying_face:', ':face_screaming_in_fear:', ':confounded_face:', ':disappointed_face:', ':downcast_face_with_sweat:', ':face_with_steam_from_nose:', ':pouting_face:', ':face_with_symbols_on_mouth:', ':smiling_face_with_horns:', ':skull:', ':pile_of_poo:', ':ogre:', ':ghost:', ':alien:', ':robot:', ':grinning_cat:', ':bomb:']
         
         self.symKey = get_random_bytes(16)
@@ -126,6 +127,12 @@ class ChatClient(Frame):
             text += ' ' 
         return text
   
+    
+    def padFileChunk(self, fileChunk):
+        while len(fileChunk) % 8 != 0:
+            fileChunk.extend(b'9')
+        return fileChunk
+        
   
     def handleEmoji(self):
         emojiWindow = Toplevel()
@@ -243,10 +250,42 @@ class ChatClient(Frame):
         except:
             self.setStatus("Error connecting to the client !!")
   
+  
     def handleClientMessages(self, clientsoc, clientaddr, flag):
         while 1:
-            try:
-                recvData = clientsoc.recv(self.buffsize)#.decode()
+            #try:
+            recvData = clientsoc.recv(self.buffsize)
+            splitData = recvData.split(self.byteSep)
+            if splitData[0] == b'FILE':
+                chunkCount = int(splitData[1].decode())
+                iv = splitData[-1]
+                clientName = splitData[-2]
+                fileName = splitData[-3]
+                print('recv chunkcount:', chunkCount)
+                print('recv iv:', iv)
+                print('recv fileName:', fileName)
+                time.sleep(0.1)
+                
+                decipher = AES.new(self.peerSymKeys[clientsoc], AES.MODE_OFB, iv)
+                #print(5)
+                tmpC = 0
+                with open(fileName, "wb") as f:
+                    #print(6)
+                    for i in range(0, chunkCount):
+                        #print(7)
+                        time.sleep(0.5)
+                        chunk = clientsoc.recv(self.buffsize)
+                        data = decipher.decrypt(chunk).strip(b'9')
+                        f.write(chunk)
+                        tmpC += 1
+                        #print(8)
+                        
+                if tmpC > 0:
+                    #self.setStatus(fileName.decode() + "received successfully !!")
+                    self.addChat(clientName.decode(), 'FILE <' + fileName.decode() + '>')
+                
+            
+            else:
                 iv = recvData[:AES.block_size]
                 recvData = recvData[AES.block_size:]
                 
@@ -261,8 +300,8 @@ class ChatClient(Frame):
                 for i in range(len(actualData) - 1):
                     msgCon += actualData[i] + ' '
                 self.addChat(actualData[-1].strip(), msgCon)
-            except:
-                break
+            #except:
+            #    break
         self.removeClient(clientsoc, clientaddr)
         clientsoc.close()
         self.setStatus("Client disconnected from %s:%s" % clientaddr)
@@ -293,24 +332,71 @@ class ChatClient(Frame):
         ws = Tk()
         ws.title('Attach File')
         ws.geometry('400x200') 
-
-    
-    def open_file():
-        file_path = askopenfile(mode='r', filetypes=[('Files', '*')])
-        if file_path is not None:
-            pass
-
-    def uploadFiles():
-        file = Label(ws, text='Attach File')
-        file.grid(row=0, column=0, padx=10) 
-
-        filebtn = Button(
+        
+        fileLabel = Label(
+            ws, 
+            text='Upload a file'
+            )
+        fileLabel.grid(row=0, column=0, padx=10)
+        
+        fileButton = Button(
             ws, 
             text ='Choose File', 
-            command = lambda:open_file()
+            command = lambda:self.openFile(ws, fileLabel, fileButton)
             ) 
-        filebtn.grid(row=0, column=1)
+        fileButton.grid(row=0, column=1)
+        ws.mainloop()
 
+    
+    def openFile(self, ws, fileLabel, fileButton):
+        #file_path = askopenfile(mode='r', filetypes=[('Files', '*')])
+        fileName = askopenfilename(filetypes=[('Files', '*')])
+        actFileName = fileName.split('/')[-1]
+        
+        if fileName is not None:
+            if actFileName:
+                fileLabel.destroy()
+                fileButton.destroy()
+                fileNameLabel = Label(ws, text = actFileName, foreground='black').grid(row=0, column=1, padx=10)
+                
+                closeButton = Button(
+                    ws, 
+                    text='Close', 
+                    command = lambda:ws.destroy()
+                    )
+                closeButton.grid(row=0, column=4, padx=10)
+                uploadButton = Button(
+                    ws, 
+                    text='Send File', 
+                    command = lambda:self.uploadFiles(ws, fileName, actFileName)
+                    )
+                uploadButton.grid(row=0, column=3, padx=10)
+            #ws.mainloop()
+            
+
+    def uploadFiles(self, ws, fileName, actFileName):
+        fileChunkCount = 0
+        with open(fileName, "rb") as f:
+            while True:
+                bytesRead = f.read(self.buffsize)
+                if not bytesRead:
+                    break
+                fileChunkCount += 1
+        tmpStr = 'FILE' + self.separator + str(fileChunkCount) + self.separator + actFileName + self.separator + self.nameVar.get()
+        iv = Random.new().read(AES.block_size)
+        
+        tmpiv = tmpStr.encode() + self.byteSep + iv
+        print('tmpiv:', tmpiv)
+        for client in self.allClients.keys():
+            client.send(tmpiv)
+        
+        
+        cipher = AES.new(self.symKey, AES.MODE_OFB, iv)
+        #msgCipher = cipher.encrypt(paddedMsg.encode())
+        
+        #print(1)
+        cnt = 0
+        
         pb1 = Progressbar(
             ws, 
             orient=HORIZONTAL, 
@@ -318,19 +404,35 @@ class ChatClient(Frame):
             mode='determinate'
             )
         pb1.grid(row=4, columnspan=3, pady=20)
-        for i in range(5):
-            ws.update_idletasks()
-            pb1['value'] += 20
-            time.sleep(1)
+                    
+        with open(fileName, "rb") as f:
+            while True:
+                bytesRead = f.read(self.buffsize)
+                if not bytesRead:
+                    break
+                
+                actualBytesRead = self.padFileChunk(bytearray(bytesRead))
+                encr = cipher.encrypt(bytes(actualBytesRead))
+                #print(2)
+                for client in self.allClients.keys():
+                    #print(3)
+                    time.sleep(0.5)
+                    client.send(encr)
+                    #print(4)
+                cnt += 1
+                ws.update_idletasks()
+                pb1['value'] += int((cnt / fileChunkCount) * 100)
+        if cnt > 0:
+            self.addChat("Me (" + self.nameVar.get() + ")", 'FILE SENT: <' + actFileName + '>')
+         
+        #for i in range(5):
+        #    ws.update_idletasks()
+        #    pb1['value'] += 20
+        #    time.sleep(0.2)
         pb1.destroy()
-        Label(ws, text='File Uploaded Successfully!', foreground='green').grid(row=4, columnspan=3, pady=10)
-
-        upld = Button(
-            ws, 
-        text='Upload Files', 
-        command=uploadFiles
-        )
-        upld.grid(row=3, columnspan=3, pady=10)
+        fileSentLabel = Label(ws, text='File Sent Successfully!', foreground='green').grid(row=4, columnspan=3, pady=10)
+        #time.sleep(2)
+        #ws.destroy()
   
   
     def addChat(self, client, msg):
