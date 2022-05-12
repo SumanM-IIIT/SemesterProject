@@ -40,6 +40,7 @@ class ChatClient(Frame):
         self.publicKeyStr = self.publicKey.export_key().decode()
         
         self.peerPublicKeys = {}
+        self.peerSymKeys = {}
         self.allClientAddrs = []
  
   
@@ -162,20 +163,12 @@ class ChatClient(Frame):
         serveraddr = (self.serverIPVar.get().replace(' ',''), int(self.serverPortVar.get().replace(' ','')))
         try:
             self.serverSoc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            #print(1)
             self.serverSoc.bind(serveraddr)
-            #print(2)
             self.serverSoc.listen(5)
-            #print(3)
             self.setStatus("Server listening on %s:%s" % serveraddr)
-            #print(4)
-            #thread.start_new_thread(self.listenClients,())
             threading.Thread(target=self.listenClients).start()
-            #print(5)
             self.serverStatus = 1
-            #print(6)
             self.name = self.nameVar.get().replace(' ','')
-            #print(7)
             if self.name == '':
                 self.name = "%s:%s" % serveraddr
         except:
@@ -184,18 +177,34 @@ class ChatClient(Frame):
   
     def listenClients(self):
         while True:
-            clientsoc, clientaddr = self.serverSoc.accept()
-            self.setStatus("Client connected from %s:%s" % clientaddr)
-            #self.addClient(clientsoc, clientaddr)
-            #thread.start_new_thread(self.handleClientMessages, (clientsoc, clientaddr))
-            
-            clientsoc.send(self.name.encode())
-            tmp = clientsoc.recv(self.buffsize).decode()
-            self.peerPublicKeys[clientsoc] = tmp
-            clientsoc.send(self.publicKeyStr.encode())
-            
-            threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr, 2)).start()
-        self.serverSoc.close()
+            try:
+                clientsoc, clientaddr = self.serverSoc.accept()
+                self.setStatus("Client connected from %s:%s" % clientaddr)
+                #self.addClient(clientsoc, clientaddr)
+                
+                clientsoc.send(self.name.encode())
+                tmp = clientsoc.recv(self.buffsize).decode()
+                self.peerPublicKeys[clientsoc] = tmp
+                clientsoc.send(self.publicKeyStr.encode())
+                
+                recvSymKey = clientsoc.recv(self.buffsize)
+                decipherRsa = PKCS1_OAEP.new(self.privateKey)
+                peerSymKey = decipherRsa.decrypt(recvSymKey)
+                print('recvSymKey2:', peerSymKey)
+                self.peerSymKeys[clientsoc] = peerSymKey
+                
+                peerPubKey = RSA.import_key(tmp)
+                cipherRsa = PKCS1_OAEP.new(peerPubKey)
+                encr = cipherRsa.encrypt(self.symKey)
+                print('SentSymKey2:', self.symKey)
+                clientsoc.send(encr)
+                
+                threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr, 2)).start()
+            except KeyboardInterrupt:
+                if self.serverSoc:
+                    self.serverSoc.close()
+                break
+        #self.serverSoc.close()
   
     def handleAddClient(self):
         if self.serverStatus == 0:
@@ -213,11 +222,22 @@ class ChatClient(Frame):
             peerName = clientsoc.recv(self.buffsize).decode()
             self.addClient(clientsoc, clientaddr, peerName)
             self.allClientAddrs.append(clientaddr)
-            #thread.start_new_thread(self.handleClientMessages, (clientsoc, clientaddr))
             
             clientsoc.send(self.publicKeyStr.encode())
             tmp = clientsoc.recv(self.buffsize).decode()
             self.peerPublicKeys[clientsoc] = tmp
+            
+            peerPubKey = RSA.import_key(tmp)
+            cipherRsa = PKCS1_OAEP.new(peerPubKey)
+            encr = cipherRsa.encrypt(self.symKey)
+            print('SentSymKey:', self.symKey)
+            clientsoc.send(encr)
+            
+            recvSymKey = clientsoc.recv(self.buffsize)
+            decipherRsa = PKCS1_OAEP.new(self.privateKey)
+            peerSymKey = decipherRsa.decrypt(recvSymKey)
+            print('recvSymKey:', peerSymKey)
+            self.peerSymKeys[clientsoc] = peerSymKey
             
             threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr, 1)).start()
         except:
@@ -226,36 +246,20 @@ class ChatClient(Frame):
     def handleClientMessages(self, clientsoc, clientaddr, flag):
         while 1:
             try:
-                recvSymKey = clientsoc.recv(self.buffsize)
-                #print('recvSymKey:', recvSymKey)
-                decipherRsa = PKCS1_OAEP.new(self.privateKey)
-                peerSymKey = decipherRsa.decrypt(recvSymKey)
-                #peerSymKey = self.privateKey.decrypt(recvSymKey)
-                print('recvSymKey:', peerSymKey)
-                #print('client2 - 1st recv')
-                #print(recvPubK)
-                #clientsoc.send(b'ACK')
-                #print('client2 - 1st send')
-                time.sleep(0.3)                
                 recvData = clientsoc.recv(self.buffsize)#.decode()
-                #print('client2 - 2nd recv')
                 iv = recvData[:AES.block_size]
                 recvData = recvData[AES.block_size:]
-                #print('received iv:', iv)
                 
-                decipher = AES.new(peerSymKey, AES.MODE_OFB, iv)
+                decipher = AES.new(self.peerSymKeys[clientsoc], AES.MODE_OFB, iv)
                 data = decipher.decrypt(recvData)
                 
                 if not data:
                     break
                 data = emoji.emojize(str(data)[2:-1])
-                #print('Data:', data)
                 actualData = data.split(self.separator)
-                #print('Actual Data:', actualData)
                 msgCon = ''
                 for i in range(len(actualData) - 1):
                     msgCon += actualData[i] + ' '
-                #self.addChat("%s:%s" % clientaddr, actualData[0])
                 self.addChat(actualData[-1].strip(), msgCon)
             except:
                 break
@@ -277,43 +281,12 @@ class ChatClient(Frame):
         
         paddedMsg = self.padding(msg) 
         iv = Random.new().read(AES.block_size)
-        #print('sent iv:', iv)
-        self.symKey = get_random_bytes(16)
         cipher = AES.new(self.symKey, AES.MODE_OFB, iv)
-        #print('padded msg: ', paddedMsg)
         msgCipher = cipher.encrypt(paddedMsg.encode())
         
-        #X = int(pow(G, self.x, P))
-        
-        #print(paddedMsg)
         for client in self.allClients.keys():
-            peerPubKey = RSA.import_key(self.peerPublicKeys[client])
-            print('peerPubKey:', peerPubKey)
-            cipherRsa = PKCS1_OAEP.new(peerPubKey)
-            #encr = cipherRsa.encrypt(self.key128)
-            
-            encr = cipherRsa.encrypt(self.symKey)
-            print('SentSymKey:', self.symKey)
-            client.send(encr)
-            #print('client1 - 1st send')
-            #tmp = client.recv(self.buffsize).decode()
-            #print('client1 - 1st recv')
-            #print('sender ack:', tmp)
-            time.sleep(0.3)
             client.send(iv + msgCipher) 
-            #print('client1 - 2nd send')
-            #print('sent iv:', iv)
         self.chatVar.set('')
-        
-        #key = b'abcdefghijklmnop'
-        
-        #print(type(msgCipher))
-        #print(msgCipher)
-        #print(bytes(paddedMsg, 'utf-8'))
-        #print(str(msgCipher))
-        #print(msgCipher.encode('hex'))
-        #decipher = AES.new(self.key128, AES.MODE_ECB)
-        #print(decipher.decrypt(msgCipher))
         
   
     def handleAttachChat(self):
@@ -380,10 +353,10 @@ class ChatClient(Frame):
             self.setStatus('This client is already connected...')
   
     def removeClient(self, clientsoc, clientaddr):
-        print(self.allClients)
+        #print(self.allClients)
         self.friends.delete(self.allClients[clientsoc])
         del self.allClients[clientsoc]
-        print(self.allClients)
+        #print(self.allClients)
   
     def setStatus(self, msg):
         self.statusLabel.config(text=msg)
