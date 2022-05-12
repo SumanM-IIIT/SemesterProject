@@ -30,7 +30,7 @@ class ChatClient(Frame):
         self.separator = '<SEP>'
         self.emojiCodes = [':grinning_face:', ':grinning_face_with_big_eyes:', ':grinning_face_with_smiling_eyes:', ':beaming_face_with_smiling_eyes:', ':grinning_squinting_face:', ':grinning_face_with_sweat:', ':rolling_on_the_floor_laughing:', ':slightly_smiling_face:', ':upside-down_face:', ':winking_face:', ':smiling_face_with_smiling_eyes:', ':smiling_face_with_halo:', ':smiling_face_with_heart-eyes:', ':star-struck:', ':face_blowing_a_kiss:', ':expressionless_face:', ':smiling_face_with_tear:', ':face_savoring_food:', ':winking_face_with_tongue:', ':squinting_face_with_tongue:', ':money-mouth_face:', ':smiling_face_with_open_hands:', ':face_with_hand_over_mouth:', ':thinking_face:', ':zipper-mouth_face:', ':neutral_face:', ':face_without_mouth:', ':unamused_face:', ':sleepy_face:', ':drooling_face:', ':sleeping_face:', ':face_with_medical_mask:', ':face_with_thermometer:', ':nauseated_face:', ':face_vomiting:', ':face_with_head-bandage:', ':sneezing_face:', ':hot_face:', ':cold_face:', ':face_with_crossed-out_eyes:', ':partying_face:', ':smiling_face_with_sunglasses:', ':face_with_monocle:', ':worried_face:', ':face_with_open_mouth:', ':flushed_face:', ':loudly_crying_face:', ':crying_face:', ':face_screaming_in_fear:', ':confounded_face:', ':disappointed_face:', ':downcast_face_with_sweat:', ':face_with_steam_from_nose:', ':pouting_face:', ':face_with_symbols_on_mouth:', ':smiling_face_with_horns:', ':skull:', ':pile_of_poo:', ':ogre:', ':ghost:', ':alien:', ':robot:', ':grinning_cat:', ':bomb:']
         
-        self.key128 = b'abcdefghijklmnop'
+        #self.key128 = b'abcdefghijklmnop'
         self.symKey = get_random_bytes(16)
         #self.x = 6
         self.privateKey = RSA.generate(1024)
@@ -40,6 +40,7 @@ class ChatClient(Frame):
         self.publicKeyStr = self.publicKey.export_key().decode()
         
         self.peerPublicKeys = {}
+        self.allClientAddrs = []
  
   
     def initUI(self):
@@ -188,6 +189,7 @@ class ChatClient(Frame):
             #self.addClient(clientsoc, clientaddr)
             #thread.start_new_thread(self.handleClientMessages, (clientsoc, clientaddr))
             
+            clientsoc.send(self.name.encode())
             tmp = clientsoc.recv(self.buffsize).decode()
             self.peerPublicKeys[clientsoc] = tmp
             clientsoc.send(self.publicKeyStr.encode())
@@ -200,11 +202,17 @@ class ChatClient(Frame):
             self.setStatus("Set server address first")
             return
         clientaddr = (self.clientIPVar.get().replace(' ',''), int(self.clientPortVar.get().replace(' ','')))
+        if self.serverIPVar.get().replace(' ','') == self.clientIPVar.get().replace(' ','') and int(self.clientPortVar.get().replace(' ','')) == int(self.serverPortVar.get().replace(' ','')):
+            self.setStatus("This is your own address !! Please type any of your friend's addresses...")
+            return
         try:
             clientsoc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             clientsoc.connect(clientaddr)
             self.setStatus("Connected to client on %s:%s" % clientaddr)
-            self.addClient(clientsoc, clientaddr)
+            
+            peerName = clientsoc.recv(self.buffsize).decode()
+            self.addClient(clientsoc, clientaddr, peerName)
+            self.allClientAddrs.append(clientaddr)
             #thread.start_new_thread(self.handleClientMessages, (clientsoc, clientaddr))
             
             clientsoc.send(self.publicKeyStr.encode())
@@ -219,11 +227,11 @@ class ChatClient(Frame):
         while 1:
             try:
                 recvSymKey = clientsoc.recv(self.buffsize)
-                print('recvSymKey:', recvSymKey)
+                #print('recvSymKey:', recvSymKey)
                 decipherRsa = PKCS1_OAEP.new(self.privateKey)
                 peerSymKey = decipherRsa.decrypt(recvSymKey)
                 #peerSymKey = self.privateKey.decrypt(recvSymKey)
-                print(peerSymKey)
+                print('recvSymKey:', peerSymKey)
                 #print('client2 - 1st recv')
                 #print(recvPubK)
                 #clientsoc.send(b'ACK')
@@ -235,7 +243,7 @@ class ChatClient(Frame):
                 recvData = recvData[AES.block_size:]
                 #print('received iv:', iv)
                 
-                decipher = AES.new(self.key128, AES.MODE_OFB, iv)
+                decipher = AES.new(peerSymKey, AES.MODE_OFB, iv)
                 data = decipher.decrypt(recvData)
                 
                 if not data:
@@ -270,7 +278,8 @@ class ChatClient(Frame):
         paddedMsg = self.padding(msg) 
         iv = Random.new().read(AES.block_size)
         #print('sent iv:', iv)
-        cipher = AES.new(self.key128, AES.MODE_OFB, iv)
+        self.symKey = get_random_bytes(16)
+        cipher = AES.new(self.symKey, AES.MODE_OFB, iv)
         #print('padded msg: ', paddedMsg)
         msgCipher = cipher.encrypt(paddedMsg.encode())
         
@@ -281,7 +290,10 @@ class ChatClient(Frame):
             peerPubKey = RSA.import_key(self.peerPublicKeys[client])
             print('peerPubKey:', peerPubKey)
             cipherRsa = PKCS1_OAEP.new(peerPubKey)
-            encr = cipherRsa.encrypt(self.key128)
+            #encr = cipherRsa.encrypt(self.key128)
+            
+            encr = cipherRsa.encrypt(self.symKey)
+            print('SentSymKey:', self.symKey)
             client.send(encr)
             #print('client1 - 1st send')
             #tmp = client.recv(self.buffsize).decode()
@@ -355,10 +367,17 @@ class ChatClient(Frame):
         self.receivedChats.insert("end",client+": "+msgPrint+"\n")
         self.receivedChats.config(state=DISABLED)
   
-    def addClient(self, clientsoc, clientaddr):
-        self.allClients[clientsoc]=self.counter
-        self.counter += 1
-        self.friends.insert(self.counter,"%s:%s" % clientaddr)
+    def addClient(self, clientsoc, clientaddr, peerName):
+        print(self.allClients)
+        if clientaddr not in self.allClientAddrs:
+            self.allClients[clientsoc]=self.counter
+            self.counter += 1
+            if peerName is not None:
+                self.friends.insert(self.counter,peerName + " - %s:%s" % clientaddr)
+            else:
+                self.friends.insert(self.counter,"%s:%s" % clientaddr)
+        else:
+            self.setStatus('This client is already connected...')
   
     def removeClient(self, clientsoc, clientaddr):
         print(self.allClients)
