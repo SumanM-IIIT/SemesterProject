@@ -185,7 +185,7 @@ class ChatClient(Frame):
         while True:
             clientsoc, clientaddr = self.serverSoc.accept()
             self.setStatus("Client connected from %s:%s" % clientaddr)
-            self.addClient(clientsoc, clientaddr)
+            #self.addClient(clientsoc, clientaddr)
             #thread.start_new_thread(self.handleClientMessages, (clientsoc, clientaddr))
             
             tmp = clientsoc.recv(self.buffsize).decode()
