@@ -8,8 +8,12 @@ import threading
 import emoji
 import time
 import PySimpleGUI as sg
-from Crypto.Cipher import AES
+from Crypto.Cipher import AES, PKCS1_OAEP
+from Crypto.PublicKey import RSA
 from Crypto import Random
+from Crypto.Random import get_random_bytes
+from binascii import hexlify
+import time
 
 
 class ChatClient(Frame):
@@ -25,7 +29,17 @@ class ChatClient(Frame):
         self.counter = 0
         self.separator = '<SEP>'
         self.emojiCodes = [':grinning_face:', ':grinning_face_with_big_eyes:', ':grinning_face_with_smiling_eyes:', ':beaming_face_with_smiling_eyes:', ':grinning_squinting_face:', ':grinning_face_with_sweat:', ':rolling_on_the_floor_laughing:', ':slightly_smiling_face:', ':upside-down_face:', ':winking_face:', ':smiling_face_with_smiling_eyes:', ':smiling_face_with_halo:', ':smiling_face_with_heart-eyes:', ':star-struck:', ':face_blowing_a_kiss:', ':expressionless_face:', ':smiling_face_with_tear:', ':face_savoring_food:', ':winking_face_with_tongue:', ':squinting_face_with_tongue:', ':money-mouth_face:', ':smiling_face_with_open_hands:', ':face_with_hand_over_mouth:', ':thinking_face:', ':zipper-mouth_face:', ':neutral_face:', ':face_without_mouth:', ':unamused_face:', ':sleepy_face:', ':drooling_face:', ':sleeping_face:', ':face_with_medical_mask:', ':face_with_thermometer:', ':nauseated_face:', ':face_vomiting:', ':face_with_head-bandage:', ':sneezing_face:', ':hot_face:', ':cold_face:', ':face_with_crossed-out_eyes:', ':partying_face:', ':smiling_face_with_sunglasses:', ':face_with_monocle:', ':worried_face:', ':face_with_open_mouth:', ':flushed_face:', ':loudly_crying_face:', ':crying_face:', ':face_screaming_in_fear:', ':confounded_face:', ':disappointed_face:', ':downcast_face_with_sweat:', ':face_with_steam_from_nose:', ':pouting_face:', ':face_with_symbols_on_mouth:', ':smiling_face_with_horns:', ':skull:', ':pile_of_poo:', ':ogre:', ':ghost:', ':alien:', ':robot:', ':grinning_cat:', ':bomb:']
+        
         self.key128 = b'abcdefghijklmnop'
+        self.symKey = get_random_bytes(16)
+        #self.x = 6
+        self.privateKey = RSA.generate(1024)
+        self.publicKey = self.privateKey.publickey()
+        
+        self.privateKeyStr = self.privateKey.export_key().decode()
+        self.publicKeyStr = self.publicKey.export_key().decode()
+        
+        self.peerPublicKeys = {}
  
   
     def initUI(self):
@@ -173,7 +187,12 @@ class ChatClient(Frame):
             self.setStatus("Client connected from %s:%s" % clientaddr)
             self.addClient(clientsoc, clientaddr)
             #thread.start_new_thread(self.handleClientMessages, (clientsoc, clientaddr))
-            threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr)).start()
+            
+            tmp = clientsoc.recv(self.buffsize).decode()
+            self.peerPublicKeys[clientsoc] = tmp
+            clientsoc.send(self.publicKeyStr.encode())
+            
+            threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr, 2)).start()
         self.serverSoc.close()
   
     def handleAddClient(self):
@@ -187,14 +206,31 @@ class ChatClient(Frame):
             self.setStatus("Connected to client on %s:%s" % clientaddr)
             self.addClient(clientsoc, clientaddr)
             #thread.start_new_thread(self.handleClientMessages, (clientsoc, clientaddr))
-            threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr)).start()
+            
+            clientsoc.send(self.publicKeyStr.encode())
+            tmp = clientsoc.recv(self.buffsize).decode()
+            self.peerPublicKeys[clientsoc] = tmp
+            
+            threading.Thread(target=self.handleClientMessages, args=(clientsoc, clientaddr, 1)).start()
         except:
             self.setStatus("Error connecting to the client !!")
   
-    def handleClientMessages(self, clientsoc, clientaddr):
+    def handleClientMessages(self, clientsoc, clientaddr, flag):
         while 1:
             try:
+                recvSymKey = clientsoc.recv(self.buffsize)
+                print('recvSymKey:', recvSymKey)
+                decipherRsa = PKCS1_OAEP.new(self.privateKey)
+                peerSymKey = decipherRsa.decrypt(recvSymKey)
+                #peerSymKey = self.privateKey.decrypt(recvSymKey)
+                print(peerSymKey)
+                #print('client2 - 1st recv')
+                #print(recvPubK)
+                #clientsoc.send(b'ACK')
+                #print('client2 - 1st send')
+                time.sleep(0.3)                
                 recvData = clientsoc.recv(self.buffsize)#.decode()
+                #print('client2 - 2nd recv')
                 iv = recvData[:AES.block_size]
                 recvData = recvData[AES.block_size:]
                 #print('received iv:', iv)
@@ -232,15 +268,29 @@ class ChatClient(Frame):
         msg += self.separator + self.nameVar.get()
         
         paddedMsg = self.padding(msg) 
-        #iv = Random.new().read(AES.block_size)
-        print('sent iv:', iv)
+        iv = Random.new().read(AES.block_size)
+        #print('sent iv:', iv)
         cipher = AES.new(self.key128, AES.MODE_OFB, iv)
         #print('padded msg: ', paddedMsg)
         msgCipher = cipher.encrypt(paddedMsg.encode())
         
+        #X = int(pow(G, self.x, P))
+        
         #print(paddedMsg)
         for client in self.allClients.keys():
-            client.send(iv + msgCipher)
+            peerPubKey = RSA.import_key(self.peerPublicKeys[client])
+            print('peerPubKey:', peerPubKey)
+            cipherRsa = PKCS1_OAEP.new(peerPubKey)
+            encr = cipherRsa.encrypt(self.key128)
+            client.send(encr)
+            #print('client1 - 1st send')
+            #tmp = client.recv(self.buffsize).decode()
+            #print('client1 - 1st recv')
+            #print('sender ack:', tmp)
+            time.sleep(0.3)
+            client.send(iv + msgCipher) 
+            #print('client1 - 2nd send')
+            #print('sent iv:', iv)
         self.chatVar.set('')
         
         #key = b'abcdefghijklmnop'
