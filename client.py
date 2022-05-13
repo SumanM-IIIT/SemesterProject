@@ -24,7 +24,7 @@ class ChatClient(Frame):
         self.initUI()
         self.serverSoc = None
         self.serverStatus = 0
-        self.buffsize = 2048
+        self.buffsize = 4096
         self.allClients = {}
         self.counter = 0
         self.separator = '<SEP>'
@@ -46,6 +46,7 @@ class ChatClient(Frame):
   
     def initUI(self):
         self.root.title("SecureChat_P2P")
+        self.root.resizable(True, True)
         ScreenSizeX = self.root.winfo_screenwidth()
         ScreenSizeY = self.root.winfo_screenheight()
         self.FrameSizeX  = 800
@@ -53,7 +54,9 @@ class ChatClient(Frame):
         FramePosX   = (ScreenSizeX - self.FrameSizeX)/2
         FramePosY   = (ScreenSizeY - self.FrameSizeY)/2
         self.root.geometry("%sx%s+%s+%s" % (self.FrameSizeX,self.FrameSizeY,int(FramePosX),int(FramePosY)))
-        self.root.resizable(width=False, height=False)
+        #self.root.resizable(width=False, height=False)
+        #self.root.grid_rowconfigure(0, weight=1)
+        #self.root.grid_columnconfigure(0, weight=1)
         
         padX = 10
         padY = 10
@@ -113,13 +116,13 @@ class ChatClient(Frame):
 
         self.statusLabel = Label(parentFrame)
 
-        bottomLabel = Label(parentFrame, text="Made by Aditya Mahajan, Suman Mitra & Akshay Chaudhary under Prof. K. Srinathan, IIIT Hyd")
+        bottomLabel = Label(parentFrame, text="Made by - Aditya Mahajan, Suman Mitra & Akshay Chaudhary under Prof. K. Srinathan, IIIT Hyderabad")
         
         ipGroup.grid(row=0, column=0)
         readChatGroup.grid(row=1, column=0)
-        writeChatGroup.grid(row=2, column=0, pady=10)
+        writeChatGroup.grid(row=2, column=0, pady=5)
         self.statusLabel.grid(row=3, column=0)
-        bottomLabel.grid(row=4, column=0, pady=10)
+        bottomLabel.grid(row=4, column=0)
   
   
     def padding(self, text):
@@ -138,6 +141,7 @@ class ChatClient(Frame):
         emojiWindow = Toplevel()
         emojiWindow.title("Emoji Window")
         emojiWindow.geometry("")
+        emojiWindow.resizable(True, True)
                 
         emojiCount = len(self.emojiCodes)
         emojiButtons = []
@@ -163,10 +167,12 @@ class ChatClient(Frame):
  
   
     def handleSetServer(self):
-        if self.serverSoc != None:
-            self.serverSoc.close()
-            self.serverSoc = None
-            self.serverStatus = 0
+        if self.serverSoc is not None:
+            self.setStatus("Your Server is already set...")
+            return
+            #self.serverSoc.close()
+            #self.serverSoc = None
+            #self.serverStatus = 0
         serveraddr = (self.serverIPVar.get().replace(' ',''), int(self.serverPortVar.get().replace(' ','')))
         try:
             self.serverSoc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -341,6 +347,7 @@ class ChatClient(Frame):
         ws.title('Attach File')
         ws.geometry('400x200') 
         ws.attributes("-topmost", True)
+        ws.resizable(True, True)
         
         fileLabel = Label(
             ws, 
