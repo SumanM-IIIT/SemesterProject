@@ -253,63 +253,63 @@ class ChatClient(Frame):
   
     def handleClientMessages(self, clientsoc, clientaddr, flag):
         while 1:
-            #try:
-            recvData = clientsoc.recv(self.buffsize)
-            splitData = recvData.split(self.byteSep)
-            if splitData[0] == b'FILE':
-                chunkCount = int(splitData[1].decode())
-                iv = splitData[-1]
-                clientName = splitData[-2].decode()
-                fileName = splitData[-3].decode()
-                print('recv chunkcount:', chunkCount)
-                print('recv iv:', iv)
-                print('recv fileName:', fileName)
-                time.sleep(0.1)
+            try:
+                recvData = clientsoc.recv(self.buffsize)
+                splitData = recvData.split(self.byteSep)
+                if splitData[0] == b'FILE':
+                    chunkCount = int(splitData[1].decode())
+                    iv = splitData[-1]
+                    clientName = splitData[-2].decode()
+                    fileName = splitData[-3].decode()
+                    print('recv chunkcount:', chunkCount)
+                    print('recv iv:', iv)
+                    print('recv fileName:', fileName)
+                    time.sleep(0.1)
+                    
+                    decipher = AES.new(self.peerSymKeys[clientsoc], AES.MODE_OFB, iv)
+                    #print(5)
+                    tmpC = 0
+                    
+                    fileStrip = fileName.split('.')
+                    if fileName in os.listdir():
+                        fileName = fileStrip[0] + '_.' + fileStrip[1]
+                    
+                    with open(fileName, "wb") as f:
+                        #print(6)
+                        for i in range(0, chunkCount):
+                            #print(7)
+                            time.sleep(0.5)
+                            chunk = clientsoc.recv(self.buffsize)
+                            #print('encr data:', chunk)
+                            data = decipher.decrypt(chunk).strip(b'9')
+                            #print('decr data:', data)
+                            #print('symKey:', self.peerSymKeys[clientsoc])
+                            f.write(data)
+                            tmpC += 1
+                            #print(8)
+                            
+                    if tmpC > 0:
+                        #self.setStatus(fileName.decode() + "received successfully !!")
+                        self.addChat(clientName, 'FILE <' + fileName + '>')
+                    
                 
-                decipher = AES.new(self.peerSymKeys[clientsoc], AES.MODE_OFB, iv)
-                #print(5)
-                tmpC = 0
-                
-                fileStrip = fileName.split('.')
-                if fileName in os.listdir():
-                    fileName = fileStrip[0] + '_.' + fileStrip[1]
-                
-                with open(fileName, "wb") as f:
-                    #print(6)
-                    for i in range(0, chunkCount):
-                        #print(7)
-                        time.sleep(0.5)
-                        chunk = clientsoc.recv(self.buffsize)
-                        #print('encr data:', chunk)
-                        data = decipher.decrypt(chunk).strip(b'9')
-                        #print('decr data:', data)
-                        #print('symKey:', self.peerSymKeys[clientsoc])
-                        f.write(data)
-                        tmpC += 1
-                        #print(8)
-                        
-                if tmpC > 0:
-                    #self.setStatus(fileName.decode() + "received successfully !!")
-                    self.addChat(clientName, 'FILE <' + fileName + '>')
-                
-            
-            else:
-                iv = recvData[:AES.block_size]
-                recvData = recvData[AES.block_size:]
-                
-                decipher = AES.new(self.peerSymKeys[clientsoc], AES.MODE_OFB, iv)
-                data = decipher.decrypt(recvData)
-                
-                if not data:
-                    break
-                data = emoji.emojize(str(data)[2:-1])
-                actualData = data.split(self.separator)
-                msgCon = ''
-                for i in range(len(actualData) - 1):
-                    msgCon += actualData[i] + ' '
-                self.addChat(actualData[-1].strip(), msgCon)
-            #except:
-            #    break
+                else:
+                    iv = recvData[:AES.block_size]
+                    recvData = recvData[AES.block_size:]
+                    
+                    decipher = AES.new(self.peerSymKeys[clientsoc], AES.MODE_OFB, iv)
+                    data = decipher.decrypt(recvData)
+                    
+                    if not data:
+                        break
+                    data = emoji.emojize(str(data)[2:-1])
+                    actualData = data.split(self.separator)
+                    msgCon = ''
+                    for i in range(len(actualData) - 1):
+                        msgCon += actualData[i] + ' '
+                    self.addChat(actualData[-1].strip(), msgCon)
+            except:
+                break
         self.removeClient(clientsoc, clientaddr)
         clientsoc.close()
         self.setStatus("Client disconnected from %s:%s" % clientaddr)
@@ -481,8 +481,11 @@ class ChatClient(Frame):
             self.setStatus('This client is already connected...')
   
     def removeClient(self, clientsoc, clientaddr):
-        self.friends.delete(self.allClients[clientsoc])
-        del self.allClients[clientsoc]
+        #print('allclients:', self.allClients)
+        #print('clientsoc:', clientsoc)
+        if clientsoc in self.allClients.keys():
+            self.friends.delete(self.allClients[clientsoc])
+            del self.allClients[clientsoc]
         
     def setStatus(self, msg):
         self.statusLabel.config(text=msg)
