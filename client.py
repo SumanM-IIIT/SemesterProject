@@ -14,7 +14,7 @@ from Crypto import Random
 from Crypto.Random import get_random_bytes
 from binascii import hexlify
 import time
-
+import os
 
 class ChatClient(Frame):
   
@@ -259,8 +259,8 @@ class ChatClient(Frame):
             if splitData[0] == b'FILE':
                 chunkCount = int(splitData[1].decode())
                 iv = splitData[-1]
-                clientName = splitData[-2]
-                fileName = splitData[-3]
+                clientName = splitData[-2].decode()
+                fileName = splitData[-3].decode()
                 print('recv chunkcount:', chunkCount)
                 print('recv iv:', iv)
                 print('recv fileName:', fileName)
@@ -269,6 +269,11 @@ class ChatClient(Frame):
                 decipher = AES.new(self.peerSymKeys[clientsoc], AES.MODE_OFB, iv)
                 #print(5)
                 tmpC = 0
+                
+                fileStrip = fileName.split('.')
+                if fileName in os.listdir():
+                    fileName = fileStrip[0] + '_.' + fileStrip[1]
+                
                 with open(fileName, "wb") as f:
                     #print(6)
                     for i in range(0, chunkCount):
@@ -285,7 +290,7 @@ class ChatClient(Frame):
                         
                 if tmpC > 0:
                     #self.setStatus(fileName.decode() + "received successfully !!")
-                    self.addChat(clientName.decode(), 'FILE <' + fileName.decode() + '>')
+                    self.addChat(clientName, 'FILE <' + fileName + '>')
                 
             
             else:
