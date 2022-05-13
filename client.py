@@ -275,8 +275,11 @@ class ChatClient(Frame):
                         #print(7)
                         time.sleep(0.5)
                         chunk = clientsoc.recv(self.buffsize)
+                        #print('encr data:', chunk)
                         data = decipher.decrypt(chunk).strip(b'9')
-                        f.write(chunk)
+                        #print('decr data:', data)
+                        #print('symKey:', self.peerSymKeys[clientsoc])
+                        f.write(data)
                         tmpC += 1
                         #print(8)
                         
@@ -412,7 +415,10 @@ class ChatClient(Frame):
                     break
                 
                 actualBytesRead = self.padFileChunk(bytearray(bytesRead))
+                #print('actualBytesRead:', actualBytesRead)
+                #print('symKey:', self.symKey)
                 encr = cipher.encrypt(bytes(actualBytesRead))
+                #print('encr data:', encr)
                 #print(2)
                 for client in self.allClients.keys():
                     #print(3)
@@ -423,7 +429,7 @@ class ChatClient(Frame):
                 ws.update_idletasks()
                 pb1['value'] += int((cnt / fileChunkCount) * 100)
         if cnt > 0:
-            self.addChat("Me (" + self.nameVar.get() + ")", 'FILE SENT: <' + actFileName + '>')
+            self.addChat("Me (" + self.nameVar.get() + ")", 'FILE SENT - <' + actFileName + '>')
          
         #for i in range(5):
         #    ws.update_idletasks()
