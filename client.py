@@ -340,111 +340,127 @@ class ChatClient(Frame):
         ws = Tk()
         ws.title('Attach File')
         ws.geometry('400x200') 
+        ws.attributes("-topmost", True)
         
         fileLabel = Label(
             ws, 
             text='Upload a file'
             )
-        fileLabel.grid(row=0, column=0, padx=10)
+        fileLabel.grid(row=0, rowspan=2, pady=10, column=0, padx=10)
         
         fileButton = Button(
             ws, 
             text ='Choose File', 
             command = lambda:self.openFile(ws, fileLabel, fileButton)
             ) 
-        fileButton.grid(row=0, column=1)
+        fileButton.grid(row=0, rowspan=2, pady=10, column=1, padx=10)
         ws.mainloop()
 
     
     def openFile(self, ws, fileLabel, fileButton):
-        #file_path = askopenfile(mode='r', filetypes=[('Files', '*')])
-        fileName = askopenfilename(filetypes=[('Files', '*')])
-        actFileName = fileName.split('/')[-1]
-        
-        if fileName is not None:
-            if actFileName:
-                fileLabel.destroy()
-                fileButton.destroy()
-                fileNameLabel = Label(ws, text = actFileName, foreground='black').grid(row=0, column=1, padx=10)
-                
-                closeButton = Button(
-                    ws, 
-                    text='Close', 
-                    command = lambda:ws.destroy()
-                    )
-                closeButton.grid(row=0, column=4, padx=10)
-                uploadButton = Button(
-                    ws, 
-                    text='Send File', 
-                    command = lambda:self.uploadFiles(ws, fileName, actFileName)
-                    )
-                uploadButton.grid(row=0, column=3, padx=10)
-            #ws.mainloop()
+        try:
+            ws.attributes("-topmost", False)
+            fileName = askopenfilename(filetypes=[('Files', '*')])
+            actFileName = fileName.split('/')[-1]
+            
+            if fileName is not None:
+                if actFileName:
+                    ws.attributes("-topmost", True)
+                    fileLabel.destroy()
+                    fileButton.destroy()
+                    fileNameLabel = Label(ws, text = actFileName, foreground='black').grid(row=0, column=0, columnspan=2, rowspan=2, padx=5, pady=5)
+                    
+                    closeButton = Button(
+                        ws, 
+                        text='Close', 
+                        command = lambda:ws.destroy()
+                        )
+                    closeButton.grid(row=2, column=1)
+                    uploadButton = Button(
+                        ws, 
+                        text='Send File', 
+                        command = lambda:self.uploadFiles(ws, fileName, actFileName, fileNameLabel, closeButton, uploadButton)
+                        )
+                    uploadButton.grid(row=2, column=0)
+                #ws.mainloop()
+        except:
+            self.setStatus("Can't open the file !!")
             
 
-    def uploadFiles(self, ws, fileName, actFileName):
-        fileChunkCount = 0
-        with open(fileName, "rb") as f:
-            while True:
-                bytesRead = f.read(self.buffsize)
-                if not bytesRead:
-                    break
-                fileChunkCount += 1
-        tmpStr = 'FILE' + self.separator + str(fileChunkCount) + self.separator + actFileName + self.separator + self.nameVar.get()
-        iv = Random.new().read(AES.block_size)
-        
-        tmpiv = tmpStr.encode() + self.byteSep + iv
-        print('tmpiv:', tmpiv)
-        for client in self.allClients.keys():
-            client.send(tmpiv)
-        
-        
-        cipher = AES.new(self.symKey, AES.MODE_OFB, iv)
-        #msgCipher = cipher.encrypt(paddedMsg.encode())
-        
-        #print(1)
-        cnt = 0
-        
-        pb1 = Progressbar(
-            ws, 
-            orient=HORIZONTAL, 
-            length=300, 
-            mode='determinate'
-            )
-        pb1.grid(row=4, columnspan=3, pady=20)
+    def uploadFiles(self, ws, fileName, actFileName, fileNameLabel, closeButton, uploadButton):
+        try:
+            if fileNameLabel:
+                fileNameLabel.destroy()
+            closeButton.destroy()
+            uploadButton.destroy()
+            
+            fileChunkCount = 0
+            with open(fileName, "rb") as f:
+                while True:
+                    bytesRead = f.read(self.buffsize)
+                    if not bytesRead:
+                        break
+                    fileChunkCount += 1
+            tmpStr = 'FILE' + self.separator + str(fileChunkCount) + self.separator + actFileName + self.separator + self.nameVar.get()
+            iv = Random.new().read(AES.block_size)
+            
+            tmpiv = tmpStr.encode() + self.byteSep + iv
+            print('tmpiv:', tmpiv)
+            for client in self.allClients.keys():
+                client.send(tmpiv)
+            
+            
+            cipher = AES.new(self.symKey, AES.MODE_OFB, iv)
+            #msgCipher = cipher.encrypt(paddedMsg.encode())
+            
+            #print(1)
+            cnt = 0
+            
+            pb1 = Progressbar(
+                ws, 
+                orient=HORIZONTAL, 
+                length=300, 
+                mode='determinate'
+                )
+            pb1.grid(row=2, column=0, columnspan=2, padx=5)
+                        
+            with open(fileName, "rb") as f:
+                while True:
+                    bytesRead = f.read(self.buffsize)
+                    if not bytesRead:
+                        break
                     
-        with open(fileName, "rb") as f:
-            while True:
-                bytesRead = f.read(self.buffsize)
-                if not bytesRead:
-                    break
-                
-                actualBytesRead = self.padFileChunk(bytearray(bytesRead))
-                #print('actualBytesRead:', actualBytesRead)
-                #print('symKey:', self.symKey)
-                encr = cipher.encrypt(bytes(actualBytesRead))
-                #print('encr data:', encr)
-                #print(2)
-                for client in self.allClients.keys():
-                    #print(3)
-                    time.sleep(0.5)
-                    client.send(encr)
-                    #print(4)
-                cnt += 1
-                ws.update_idletasks()
-                pb1['value'] += int((cnt / fileChunkCount) * 100)
-        if cnt > 0:
-            self.addChat("Me (" + self.nameVar.get() + ")", 'FILE SENT - <' + actFileName + '>')
-         
-        #for i in range(5):
-        #    ws.update_idletasks()
-        #    pb1['value'] += 20
-        #    time.sleep(0.2)
-        pb1.destroy()
-        fileSentLabel = Label(ws, text='File Sent Successfully!', foreground='green').grid(row=4, columnspan=3, pady=10)
-        #time.sleep(2)
-        #ws.destroy()
-  
+                    actualBytesRead = self.padFileChunk(bytearray(bytesRead))
+                    #print('actualBytesRead:', actualBytesRead)
+                    #print('symKey:', self.symKey)
+                    encr = cipher.encrypt(bytes(actualBytesRead))
+                    #print('encr data:', encr)
+                    #print(2)
+                    for client in self.allClients.keys():
+                        #print(3)
+                        time.sleep(0.5)
+                        client.send(encr)
+                        #print(4)
+                    cnt += 1
+                    ws.update_idletasks()
+                    pb1['value'] += int((cnt / fileChunkCount) * 100)
+            if cnt > 0:
+                self.addChat("Me (" + self.nameVar.get() + ")", 'FILE SENT - <' + actFileName + '>')
+             
+            #for i in range(5):
+            #    ws.update_idletasks()
+            #    pb1['value'] += 20
+            #    time.sleep(0.2)
+            time.sleep(2)
+            pb1.destroy()
+            #fileSentLabel = Label(ws, text='File <' + actFileName + '> Sent Successfully!', foreground='green').grid(row=6, rowspan=2, column=0, columnspan=3, pady=10, padx=10)
+            #if fileSentLabel:
+            #    fileSentLabel.destroy()
+            time.sleep(1)
+            ws.destroy()
+        except:
+            self.setStatus("An Error occurred during file upload !!")
+      
   
     def addChat(self, client, msg):
         msg = msg.strip()
