@@ -151,7 +151,7 @@ class ChatClient(Frame):
         clickEmojiBtn = []
     
         for i in range(emojiCount):
-            clickEmojiBtn.append(PhotoImage(file='emojis/' + str(i + 1) + '.png'))
+            clickEmojiBtn.append(PhotoImage(file='E:/IIIT-H_Sem1_Suman/SEMESTER-4/SEMESTER PROJECT/SemesterProject/emojis/' + str(i + 1) + '.png'))
             emojiButtons.append(Button(emojiWindow, width=5, image = clickEmojiBtn[i], command=lambda k=i:self.handleEmojiPress(k)))
             emojiButtons[i].grid(row=rowCount, column=k+1, padx=2)
             k += 1
