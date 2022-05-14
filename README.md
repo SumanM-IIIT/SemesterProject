@@ -1,6 +1,6 @@
 # Final Semester Project
 
-#### SecureChat - An E2EE P2P Chatting App
+### SecureChat - An E2EE P2P Chatting App
 
 **Made by** -
 - Suman Mitra - **2020202018**
