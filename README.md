@@ -8,7 +8,9 @@
 - Akshay Choudhary - **2020202013**
 
 **Batch** - MTech 2k20 - 2nd Yr (CSIS), IIIT Hyderabad 
+
 **Mentor** - Dr. Kannan Srinathan, CSTAR Lab, IIIT Hyderabad
+
 **Submission Date** - 14th May, 2022
 
 **Running the app** - Open a client using the following command: `python3 ./client.py`
